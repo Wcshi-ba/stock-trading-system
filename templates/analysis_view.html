@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分析结果 - {{ ticker }}</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #f7f8fc; }
+        .header { padding: 12px 16px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.06); position: sticky; top: 0; }
+        .header h2 { margin: 0; font-size: 18px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); grid-gap: 16px; }
+        .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); overflow: hidden; }
+        .card h3 { margin: 0; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; font-size: 16px; }
+        .card .img-wrap { padding: 10px; }
+        .card img { width: 100%; height: auto; display: block; border-radius: 6px; background: #fafafa; }
+        .toolbar { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
+        .btn { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d7de; background: #fff; cursor: pointer; }
+        .btn:hover { background: #f6f8fa; }
+        .tip { color: #666; font-size: 12px; margin-left: auto; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h2>分析结果 - {{ ticker }}</h2>
+        </div>
+    </div>
+    <div class="container">
+        <div class="toolbar">
+            <button class="btn" onclick="window.history.back()">返回</button>
+            <a class="btn" href="/api/report/export" target="_blank">导出PDF报告</a>
+            <span class="tip">若图片未显示，请先点击“开始分析”生成结果</span>
+        </div>
+        <div class="grid">
+            <div class="card">
+                <h3>价格预测</h3>
+                <div class="img-wrap">
+                    <img src="{{ images['prediction'] }}" alt="prediction" onerror="this.src='';this.closest('.card').querySelector('h3').innerText+='（暂无）'">
+                </div>
+            </div>
+            <div class="card">
+                <h3>训练损失</h3>
+                <div class="img-wrap">
+                    <img src="{{ images['loss'] }}" alt="loss" onerror="this.src='';this.closest('.card').querySelector('h3').innerText+='（暂无）'">
+                </div>
+            </div>
+            <div class="card">
+                <h3>累积收益</h3>
+                <div class="img-wrap">
+                    <img src="{{ images['earnings'] }}" alt="earnings" onerror="this.src='';this.closest('.card').querySelector('h3').innerText+='（暂无）'">
+                </div>
+            </div>
+            <div class="card">
+                <h3>交易信号</h3>
+                <div class="img-wrap">
+                    <img src="{{ images['trades'] }}" alt="trades" onerror="this.src='';this.closest('.card').querySelector('h3').innerText+='（暂无）'">
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 允许通过 hash 传递 ticker: /analysis/view#AAPL
+        (function(){
+            if(!'{{ ticker }}' && location.hash){
+                const t = location.hash.slice(1);
+                if(t){ location.replace(`/analysis/view?ticker=${encodeURIComponent(t)}`); }
+            }
+        })();
+    </script>
+</body>
+</html>
+
+

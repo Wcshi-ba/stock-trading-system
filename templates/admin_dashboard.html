@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员后台 - 智能股票交易系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/element-plus@2.4.4/dist/index.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/element-plus@2.4.4/dist/index.full.js"></script>
+    <script src="https://unpkg.com/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .admin-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            width: 250px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px 0;
+        }
+        
+        .sidebar-header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+        }
+        
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .sidebar-menu li {
+            margin: 5px 0;
+        }
+        
+        .sidebar-menu a {
+            display: block;
+            padding: 12px 20px;
+            color: #666;
+            text-decoration: none;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+        
+        .sidebar-menu a:hover,
+        .sidebar-menu a.active {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            border-left-color: #667eea;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .content-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .chart-container h3 {
+            margin: 0 0 20px 0;
+            color: #333;
+        }
+        
+        .data-table {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #f56c6c;
+        }
+    </style>
+</head>
+<body>
+{% raw %}
+    <div id="app">
+        <div class="admin-container">
+            <!-- 侧边栏 -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2>管理员后台</h2>
+                </div>
+                <ul class="sidebar-menu">
+                    <li><a href="#" @click.prevent="activeTab = 'dashboard'; loadDashboardData()" :class="{active: activeTab === 'dashboard'}">仪表板</a></li>
+                    <li><a href="#" @click.prevent="activeTab = 'users'; refreshUsers()" :class="{active: activeTab === 'users'}">用户管理</a></li>
+                    <li><a href="#" @click.prevent="activeTab = 'resets'; refreshResets()" :class="{active: activeTab === 'resets'}">密码重置记录</a></li>
+                    <li><a href="#" @click.prevent="activeTab = 'analyses'; refreshAnalyses()" :class="{active: activeTab === 'analyses'}">分析记录</a></li>
+                    <li><a href="#" @click.prevent="activeTab = 'trades'; refreshTrades()" :class="{active: activeTab === 'trades'}">交易记录</a></li>
+                    <li><a href="#" @click.prevent="activeTab = 'system'; refreshSystemInfo()" :class="{active: activeTab === 'system'}">系统监控</a></li>
+                    <li><a href="#" @click.prevent="activeTab = 'roles'; refreshRoles()" :class="{active: activeTab === 'roles'}">角色管理</a></li>
+                    <li><a href="#" @click.prevent="enterTaskMonitor" :class="{active: activeTab === 'tasks'}">任务监控</a></li>
+                    <li><a href="#" @click.prevent="activeTab = 'feedbacks'; refreshFeedbacks()" :class="{active: activeTab === 'feedbacks'}">用户反馈</a></li>
+                    <li><a href="#" @click.prevent="activeTab = 'settings'; loadSettings()" :class="{active: activeTab === 'settings'}">系统设置</a></li>
+                </ul>
+            </div>
+            
+            <!-- 主内容区 -->
+            <div class="main-content">
+                <!-- 仪表板 -->
+                <div v-if="activeTab === 'dashboard'">
+                    <div class="content-header">
+                        <div>
+                        <h1>系统概览</h1>
+                        <p>智能股票交易系统管理后台</p>
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                            <span style="color:#666;font-size:13px;">统计天数</span>
+                            <el-input-number v-model="dashboardFilters.days" :min="7" :max="365" :step="1" controls-position="right"></el-input-number>
+                            <el-button type="primary" @click="loadDashboardData">刷新概览</el-button>
+                        </div>
+                    </div>
+                    
+                    <!-- 统计卡片 -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>总用户数</h3>
+                            <div class="value">{{ stats.totalUsers }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>今日分析</h3>
+                            <div class="value">{{ stats.todayAnalyses }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>总交易数</h3>
+                            <div class="value">{{ stats.totalTrades }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>活跃用户(近{{ dashboardFilters.days }}天)</h3>
+                            <div class="value">{{ stats.activeUsers || 0 }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>平均耗时(秒)</h3>
+                            <div class="value">{{ formatExecutionTime(stats.avgExecutionTime) }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>系统状态</h3>
+                            <div class="value" :style="{color: stats.systemStatus === '正常' ? '#67c23a' : '#f56c6c'}">
+                                {{ stats.systemStatus }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 图表区域 -->
+                    <div class="chart-container">
+                        <h3>用户增长趋势</h3>
+                        <div id="userGrowthChart" style="height: 300px;"></div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <h3>分析活动统计</h3>
+                        <div id="analysisChart" style="height: 300px;"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>分析类型分布</h3>
+                        <div id="analysisTypeChart" style="height: 300px;"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>用户活跃排行</h3>
+                        <div id="topUsersChart" style="height: 300px;"></div>
+                    </div>
+                </div>
+                
+                <!-- 用户管理 -->
+                <div v-if="activeTab === 'users'">
+                    <div class="content-header">
+                        <h1>用户管理</h1>
+                        <el-button type="primary" @click="refreshUsers">刷新</el-button>
+                    </div>
+                    
+                    <div class="data-table">
+                        <el-table :data="users" v-loading="loading" stripe>
+                            <el-table-column prop="id" label="ID" width="70"></el-table-column>
+                            <el-table-column prop="username" label="用户名" width="110"></el-table-column>
+                            <el-table-column prop="email" label="邮箱" width="180"></el-table-column>
+                            <el-table-column prop="role" label="角色" width="90">
+                                <template #default="scope">
+                                    <el-tag :type="scope.row.role === 'admin' ? 'danger' : 'primary'" size="small">
+                                        {{ scope.row.role === 'admin' ? '管理员' : '普通用户' }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="created_at" label="注册时间" width="165"></el-table-column>
+                            <el-table-column prop="last_login" label="最后登录" width="165"></el-table-column>
+                            <el-table-column prop="status" label="状态" width="90">
+                                <template #default="scope">
+                                    <el-tag :type="scope.row.status === 'active' ? 'success' : 'danger'">
+                                        {{ scope.row.status === 'active' ? '活跃' : '禁用' }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="操作" min-width="280" fixed="right">
+                                <template #default="scope">
+                                    <el-button size="small" @click="editUser(scope.row)">编辑角色</el-button>
+                                    <el-button size="small" type="warning" @click="resetUserPwd(scope.row)">重置密码</el-button>
+                                    <el-button size="small" :type="scope.row.is_active ? 'danger' : 'success'" @click="toggleUser(scope.row)">
+                                        {{ scope.row.is_active ? '冻结' : '启用' }}
+                                    </el-button>
+                                    <el-button size="small" type="danger" @click="deleteUser(scope.row)" plain>删除</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </div>
+                
+                <!-- 密码重置记录 -->
+                <div v-if="activeTab === 'resets'">
+                    <div class="content-header">
+                        <h1>密码重置记录</h1>
+                        <p style="margin:0 0 10px 0;color:#666;font-size:14px;">用户申请重置密码后，重置码会在此列出，可复制给用户使用（10分钟内有效）</p>
+                        <el-button type="primary" @click="refreshResets">刷新</el-button>
+                    </div>
+                    <div class="data-table">
+                        <el-table :data="resets" v-loading="loading" stripe>
+                            <el-table-column prop="id" label="ID" width="70"></el-table-column>
+                            <el-table-column prop="username" label="用户名" width="120"></el-table-column>
+                            <el-table-column prop="reset_code" label="重置码" min-width="200"></el-table-column>
+                            <el-table-column prop="created_at" label="创建时间" width="170"></el-table-column>
+                            <el-table-column prop="expires_at" label="过期时间" width="170"></el-table-column>
+                            <el-table-column prop="is_used" label="已使用" width="90">
+                                <template #default="scope">
+                                    <el-tag :type="scope.row.is_used ? 'info' : 'success'">
+                                        {{ scope.row.is_used ? '是' : '否' }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="操作" width="120" fixed="right">
+                                <template #default="scope">
+                                    <el-button size="small" type="primary" @click="copyResetCode(scope.row.reset_code)">复制重置码</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                    <div v-if="resets.length === 0 && !loading" style="text-align:center;padding:40px;color:#999;">暂无密码重置记录</div>
+                </div>
+                
+                <!-- 分析记录 -->
+                <div v-if="activeTab === 'analyses'">
+                    <div class="content-header">
+                        <h1>分析记录</h1>
+                        <el-button type="primary" @click="refreshAnalyses">刷新</el-button>
+                    </div>
+                    
+                    <div class="data-table">
+                        <el-table :data="analyses" v-loading="loading" stripe>
+                            <el-table-column prop="id" label="ID" width="80"></el-table-column>
+                            <el-table-column prop="username" label="用户" width="120"></el-table-column>
+                            <el-table-column prop="ticker" label="股票代码" width="100"></el-table-column>
+                            <el-table-column prop="analysis_type" label="分析类型" width="150"></el-table-column>
+                            <el-table-column prop="created_at" label="创建时间" width="180"></el-table-column>
+                            <el-table-column prop="execution_time" label="执行时间(秒)" width="120"></el-table-column>
+                            <el-table-column label="操作" width="150">
+                                <template #default="scope">
+                                    <el-button size="small" @click="viewAnalysis(scope.row)">查看</el-button>
+                                    <el-button size="small" type="danger" @click="deleteAnalysis(scope.row)">删除</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </div>
+                
+                <!-- 交易记录 -->
+                <div v-if="activeTab === 'trades'">
+                    <div class="content-header">
+                        <h1>交易记录</h1>
+                        <el-button type="primary" @click="refreshTrades">刷新</el-button>
+                    </div>
+                    
+                    <div class="data-table">
+                        <el-table :data="trades" v-loading="loading" stripe>
+                            <el-table-column prop="id" label="ID" width="80"></el-table-column>
+                            <el-table-column prop="username" label="用户" width="120"></el-table-column>
+                            <el-table-column prop="ticker" label="股票代码" width="100"></el-table-column>
+                            <el-table-column prop="action" label="操作" width="80"></el-table-column>
+                            <el-table-column prop="quantity" label="数量" width="100"></el-table-column>
+                            <el-table-column prop="price" label="价格" width="100"></el-table-column>
+                            <el-table-column prop="created_at" label="交易时间" width="180"></el-table-column>
+                            <el-table-column prop="strategy" label="策略" width="120"></el-table-column>
+                        </el-table>
+                    </div>
+                </div>
+                
+                <!-- 系统监控 -->
+                <div v-if="activeTab === 'system'">
+                    <div class="content-header">
+                        <h1>系统监控</h1>
+                        <el-button type="primary" @click="refreshSystemInfo">刷新</el-button>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>CPU使用率</h3>
+                            <div class="value">{{ formatPercent(systemInfo.cpuUsage) }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>内存使用率</h3>
+                            <div class="value">{{ formatPercent(systemInfo.memoryUsage) }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>磁盘使用率</h3>
+                            <div class="value">{{ formatPercent(systemInfo.diskUsage) }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>运行时间</h3>
+                            <div class="value">{{ systemInfo.uptime }}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <h3>系统资源使用趋势</h3>
+                        <div id="systemChart" style="height: 300px;"></div>
+                    </div>
+                </div>
+                
+                <!-- 角色管理 -->
+                <div v-if="activeTab === 'roles'">
+                    <div class="content-header">
+                        <h1>角色管理</h1>
+                        <p style="margin:0 0 10px 0;color:#666;font-size:14px;">配置各角色的功能权限，普通用户可用的策略与模型由下方开关控制</p>
+                        <el-button type="primary" @click="refreshRoles">刷新</el-button>
+                    </div>
+                    
+                    <div class="data-table">
+                        <el-table :data="roleTableData" v-loading="loading" stripe border>
+                            <el-table-column prop="permissionLabel" label="权限项" min-width="140" fixed="left"></el-table-column>
+                            <el-table-column v-for="r in roles" :key="r" :label="r === 'admin' ? '管理员' : (r === 'user' ? '普通用户' : (r === 'guest' ? '游客' : r))" width="120" align="center">
+                                <template #default="scope">
+                                    <el-switch :model-value="scope.row.permissions[r]" @change="(v) => updateRolePermission(r, scope.row.permissionKey, v)"></el-switch>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </div>
+                
+                <!-- 任务监控 -->
+                <div v-if="activeTab === 'tasks'">
+                    <div class="content-header">
+                        <h1>任务监控</h1>
+                        <p style="margin:0 0 10px 0;color:#666;font-size:14px;">按用户监视任务活跃度与最近分析记录</p>
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                            <el-select v-model="taskFilters.username" clearable placeholder="全部用户" style="width:180px;">
+                                <el-option label="全部用户" value=""></el-option>
+                                <el-option v-for="u in taskUsers" :key="u" :label="u" :value="u"></el-option>
+                            </el-select>
+                            <span style="font-size:13px;color:#666;">最近天数</span>
+                            <el-input-number v-model="taskFilters.days" :min="1" :max="3650" :step="1" controls-position="right"></el-input-number>
+                            <span style="font-size:13px;color:#666;">返回条数</span>
+                            <el-input-number v-model="taskFilters.limit" :min="10" :max="500" :step="10" controls-position="right"></el-input-number>
+                            <el-button type="primary" @click="refreshTasks">筛选任务</el-button>
+                            <el-button @click="refreshUserTaskOverview">刷新概览</el-button>
+                            <el-button @click="resetTaskFilters">重置</el-button>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid" style="margin-top: 0;">
+                        <div class="stat-card">
+                            <h3>任务总数</h3>
+                            <div class="value">{{ taskSummary.total || 0 }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>涉及用户</h3>
+                            <div class="value">{{ taskSummary.user_count || 0 }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>监视范围</h3>
+                            <div class="value">{{ taskSummary.range_days || taskFilters.days }}天</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>当前筛选</h3>
+                            <div class="value" style="font-size:20px;">{{ taskFilters.username || '全部用户' }}</div>
+                        </div>
+                    </div>
+
+                    <div class="data-table" style="margin-top: 20px;">
+                        <h3 style="margin: 0 0 12px 0;">用户任务概览</h3>
+                        <el-table :data="userTaskOverview" v-loading="loading" stripe>
+                            <el-table-column prop="username" label="用户名" min-width="130">
+                                <template #default="scope">
+                                    <el-link type="primary" @click="filterTasksByUser(scope.row.username)">
+                                        {{ scope.row.username }}
+                                    </el-link>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="status" label="账号状态" width="100">
+                                <template #default="scope">
+                                    <el-tag :type="scope.row.status === 'active' ? 'success' : 'info'" size="small">
+                                        {{ scope.row.status === 'active' ? '活跃' : '禁用' }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="total_tasks" label="任务总数" width="100"></el-table-column>
+                            <el-table-column prop="today_tasks" label="今日任务" width="100"></el-table-column>
+                            <el-table-column prop="avg_execution_time" label="平均耗时(秒)" width="120">
+                                <template #default="scope">
+                                    {{ formatExecutionTime(scope.row.avg_execution_time) }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="last_task_at" label="最近任务时间" min-width="170">
+                                <template #default="scope">
+                                    {{ scope.row.last_task_at || '-' }}
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                    
+                    <div class="data-table">
+                        <el-table :data="tasks" v-loading="loading" stripe>
+                            <el-table-column prop="id" label="ID" width="70"></el-table-column>
+                            <el-table-column prop="username" label="用户" width="100"></el-table-column>
+                            <el-table-column prop="ticker" label="股票" width="90"></el-table-column>
+                            <el-table-column prop="type" label="类型" width="120"></el-table-column>
+                            <el-table-column prop="status" label="状态" width="90">
+                                <template #default="scope">
+                                    <el-tag :type="taskStatusType(scope.row.status)" size="small">{{ scope.row.status }}</el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="execution_time" label="耗时(秒)" width="100">
+                                <template #default="scope">
+                                    {{ formatExecutionTime(scope.row.execution_time) }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="created_at" label="创建时间" min-width="170"></el-table-column>
+                        </el-table>
+                    </div>
+                </div>
+
+                <!-- 用户反馈 -->
+                <div v-if="activeTab === 'feedbacks'">
+                    <div class="content-header">
+                        <h1>用户反馈</h1>
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                            <el-select v-model="feedbackFilterStatus" placeholder="反馈状态" style="width:180px;">
+                                <el-option label="全部" value="all"></el-option>
+                                <el-option label="待处理" value="pending"></el-option>
+                                <el-option label="处理中" value="processing"></el-option>
+                                <el-option label="已解决" value="resolved"></el-option>
+                                <el-option label="已拒绝" value="rejected"></el-option>
+                            </el-select>
+                            <el-button type="primary" @click="refreshFeedbacks">刷新</el-button>
+                        </div>
+                    </div>
+                    <div class="data-table">
+                        <el-table :data="feedbacks" v-loading="loading" stripe>
+                            <el-table-column prop="id" label="ID" width="70"></el-table-column>
+                            <el-table-column prop="username" label="用户名" width="120"></el-table-column>
+                            <el-table-column prop="feedback_type" label="类型" width="120"></el-table-column>
+                            <el-table-column prop="content" label="反馈内容" min-width="240"></el-table-column>
+                            <el-table-column prop="rating" label="评分" width="80"></el-table-column>
+                            <el-table-column prop="status" label="状态" width="100">
+                                <template #default="scope">
+                                    <el-tag :type="feedbackStatusTag(scope.row.status)" size="small">{{ scope.row.status }}</el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="admin_reply" label="管理员回复" min-width="180">
+                                <template #default="scope">{{ scope.row.admin_reply || '-' }}</template>
+                            </el-table-column>
+                            <el-table-column prop="created_at" label="创建时间" width="170"></el-table-column>
+                            <el-table-column label="操作" width="120" fixed="right">
+                                <template #default="scope">
+                                    <el-button size="small" type="primary" @click="replyFeedback(scope.row)">回复</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </div>
+                
+                <!-- 系统设置 -->
+                <div v-if="activeTab === 'settings'">
+                    <div class="content-header">
+                        <h1>系统设置</h1>
+                    </div>
+                    
+                    <div class="data-table" style="margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 15px 0;">基础设置</h3>
+                        <el-form :model="settings" label-width="120px">
+                            <el-form-item label="系统名称">
+                                <el-input v-model="settings.systemName"></el-input>
+                            </el-form-item>
+                            <el-form-item label="最大用户数">
+                                <el-input-number v-model="settings.maxUsers" :min="1" :max="10000"></el-input-number>
+                            </el-form-item>
+                            <el-form-item label="数据更新间隔">
+                                <el-input-number v-model="settings.updateInterval" :min="1" :max="3600"></el-input-number>
+                            </el-form-item>
+                            <el-form-item label="启用邮件通知">
+                                <el-switch v-model="settings.emailNotification"></el-switch>
+                            </el-form-item>
+                            <el-form-item label="测试收件邮箱">
+                                <el-input v-model="settings.testEmail" placeholder="输入你的邮箱后点击发送测试邮件"></el-input>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="primary" @click="saveSettings">保存设置</el-button>
+                                <el-button type="success" @click="sendTestEmail" style="margin-left: 10px;">发送测试邮件</el-button>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+                    
+                    <div class="data-table">
+                        <h3 style="margin: 0 0 15px 0;">高级设置（模型与策略配置）</h3>
+                        <p style="margin:0 0 15px 0;color:#666;font-size:13px;">配置系统支持的预测模型和策略组合，为普通用户预设参数范围，防止误用导致资源浪费</p>
+                        <el-form :model="advancedSettings" label-width="160px">
+                            <el-form-item label="启用多模型集成">
+                                <el-switch v-model="advancedSettings.multi_model_enabled"></el-switch>
+                            </el-form-item>
+                            <el-form-item label="可用回测策略">
+                                <el-checkbox-group v-model="advancedSettings.available_strategies">
+                                    <el-checkbox label="momentum">动量策略</el-checkbox>
+                                    <el-checkbox label="mean_reversion">均值回归</el-checkbox>
+                                    <el-checkbox label="rsi">RSI策略</el-checkbox>
+                                    <el-checkbox label="macd">MACD策略</el-checkbox>
+                                    <el-checkbox label="ma_crossover">均线交叉</el-checkbox>
+                                    <el-checkbox label="breakout">突破策略</el-checkbox>
+                                </el-checkbox-group>
+                            </el-form-item>
+                            <el-form-item label="训练轮数上限">
+                                <el-input-number v-model="advancedSettings.epochs_max" :min="100" :max="10000"></el-input-number>
+                            </el-form-item>
+                            <el-form-item label="训练轮数下限">
+                                <el-input-number v-model="advancedSettings.epochs_min" :min="10" :max="500"></el-input-number>
+                            </el-form-item>
+                            <el-form-item label="学习率下限">
+                                <el-input-number v-model="advancedSettings.learning_rate_min" :min="0.00001" :max="0.1" :step="0.0001" :precision="5"></el-input-number>
+                            </el-form-item>
+                            <el-form-item label="学习率上限">
+                                <el-input-number v-model="advancedSettings.learning_rate_max" :min="0.0001" :max="0.5" :step="0.001" :precision="4"></el-input-number>
+                            </el-form-item>
+                            <el-form-item label="初始资金上限($)">
+                                <el-input-number v-model="advancedSettings.initial_money_max" :min="1000" :max="10000000"></el-input-number>
+                            </el-form-item>
+                            <el-form-item label="初始资金下限($)">
+                                <el-input-number v-model="advancedSettings.initial_money_min" :min="100" :max="100000"></el-input-number>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="primary" @click="saveAdvancedSettings">保存高级设置</el-button>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        const { ElButton, ElTable, ElTableColumn, ElTag, ElForm, ElFormItem, ElInput, ElInputNumber, ElSwitch, ElCheckbox, ElCheckboxGroup } = ElementPlus;
+
+        createApp({
+            components: {
+                ElButton,
+                ElTable,
+                ElTableColumn,
+                ElTag,
+                ElForm,
+                ElFormItem,
+                ElInput,
+                ElInputNumber,
+                ElSwitch,
+                ElCheckbox,
+                ElCheckboxGroup
+            },
+            data() {
+                return {
+                    activeTab: 'dashboard',
+                    loading: false,
+                    stats: {
+                        totalUsers: 0,
+                        todayAnalyses: 0,
+                        totalAnalyses: 0,
+                        rangeAnalyses: 0,
+                        totalTrades: 0,
+                        activeUsers: 0,
+                        avgExecutionTime: null,
+                        systemStatus: '正常'
+                    },
+                    users: [],
+                    resets: [],
+                    analyses: [],
+                    trades: [],
+                    systemInfo: {
+                        cpuUsage: null,
+                        memoryUsage: null,
+                        diskUsage: null,
+                        uptime: '未知',
+                        status: '正常'
+                    },
+                    dashboardFilters: {
+                        days: 30
+                    },
+                    dashboardCharts: {
+                        range_days: 30,
+                        user_growth: { labels: [], values: [] },
+                        analysis_trend: { labels: [], values: [] },
+                        analysis_type_dist: [],
+                        top_users: { labels: [], values: [] }
+                    },
+                    systemHistory: [],
+                    chartInstances: {
+                        userGrowth: null,
+                        analysis: null,
+                        analysisType: null,
+                        topUsers: null,
+                        system: null
+                    },
+                    settings: {
+                        systemName: '智能股票交易系统',
+                        maxUsers: 1000,
+                        updateInterval: 300,
+                        emailNotification: true,
+                        testEmail: ''
+                    },
+                    roles: [],
+                    rolePermissions: {},
+                    permissionLabels: {},
+                    tasks: [],
+                    taskUsers: [],
+                    taskSummary: {
+                        total: 0,
+                        completed: 0,
+                        failed: 0,
+                        running: 0,
+                        user_count: 0,
+                        range_days: 30
+                    },
+                    taskFilters: {
+                        username: '',
+                        days: 30,
+                        limit: 200
+                    },
+                    userTaskOverview: [],
+                    feedbacks: [],
+                    feedbackFilterStatus: 'all',
+                    advancedSettings: {
+                        multi_model_enabled: true,
+                        available_strategies: ['momentum', 'mean_reversion', 'rsi', 'macd', 'ma_crossover', 'breakout'],
+                        epochs_max: 2000,
+                        epochs_min: 50,
+                        learning_rate_min: 0.0001,
+                        learning_rate_max: 0.01,
+                        initial_money_max: 1000000,
+                        initial_money_min: 1000
+                    }
+                }
+            },
+            computed: {
+                roleTableData() {
+                    const labels = this.permissionLabels;
+                    const perms = this.rolePermissions;
+                    const roles = this.roles;
+                    const allPerms = new Set();
+                    Object.values(perms).forEach(r => Object.keys(r).forEach(p => allPerms.add(p)));
+                    return Array.from(allPerms).map(p => ({
+                        permissionKey: p,
+                        permissionLabel: labels[p] || p,
+                        permissions: Object.fromEntries(roles.map(r => [r, !!(perms[r] && perms[r][p])]))
+                    }));
+                }
+            },
+            mounted() {
+                this.loadDashboardData();
+            },
+            methods: {
+                async loadDashboardData() {
+                    try {
+                        this.loading = true;
+                        const days = Math.min(365, Math.max(7, Number(this.dashboardFilters.days || 30)));
+                        this.dashboardFilters.days = days;
+                        const response = await fetch(`/api/admin/dashboard?days=${encodeURIComponent(days)}`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.stats = Object.assign({}, this.stats, data.stats || {});
+                            this.dashboardCharts = Object.assign({}, this.dashboardCharts, data.charts || {});
+                            this.$nextTick(() => {
+                                this.renderDashboardCharts(this.dashboardCharts);
+                            });
+                        } else {
+                            this.$message?.error(data.message || '加载仪表板数据失败');
+                        }
+                    } catch (error) {
+                        console.error('加载仪表板数据失败:', error);
+                        this.$message?.error('加载仪表板数据失败');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async refreshUsers() {
+                    try {
+                        this.loading = true;
+                        const response = await fetch('/api/admin/users');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.users = data.users || [];
+                        } else {
+                            this.$message?.error(data.message || '加载用户列表失败');
+                        }
+                    } catch (error) {
+                        console.error('加载用户数据失败:', error);
+                        this.$message?.error('加载用户数据失败');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async refreshResets() {
+                    try {
+                        this.loading = true;
+                        const response = await fetch('/api/admin/password_resets');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.resets = data.resets || [];
+                        } else {
+                            this.$message?.error(data.message || '加载重置记录失败');
+                        }
+                    } catch (error) {
+                        console.error('加载密码重置记录失败:', error);
+                        this.$message?.error('加载密码重置记录失败');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                copyResetCode(code) {
+                    if (!code) return;
+                    const text = String(code);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(() => {
+                            this.$message?.success('重置码已复制到剪贴板');
+                        }).catch(() => { this.fallbackCopy(text); });
+                    } else {
+                        this.fallbackCopy(text);
+                    }
+                },
+                fallbackCopy(text) {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try {
+                        document.execCommand('copy');
+                        this.$message?.success('重置码已复制到剪贴板');
+                    } catch (e) {
+                        this.$message?.error('复制失败，请手动复制');
+                    }
+                    document.body.removeChild(ta);
+                },
+                
+                async refreshAnalyses() {
+                    try {
+                        this.loading = true;
+                        const response = await fetch('/api/admin/analyses');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.analyses = data.analyses;
+                        }
+                    } catch (error) {
+                        console.error('加载分析数据失败:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async refreshTrades() {
+                    try {
+                        this.loading = true;
+                        const response = await fetch('/api/admin/trades');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.trades = data.trades;
+                        }
+                    } catch (error) {
+                        console.error('加载交易数据失败:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async refreshSystemInfo() {
+                    try {
+                        this.loading = true;
+                        const response = await fetch('/api/admin/system');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.systemInfo = Object.assign({}, this.systemInfo, data.systemInfo || {});
+                            this.systemHistory = data.history || [];
+                            this.$nextTick(() => {
+                                this.renderSystemChart(this.systemHistory);
+                            });
+                        } else {
+                            this.$message?.error(data.message || '加载系统信息失败');
+                        }
+                    } catch (error) {
+                        console.error('加载系统信息失败:', error);
+                        this.$message?.error('加载系统信息失败');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async refreshRoles() {
+                    try {
+                        this.loading = true;
+                        const response = await fetch('/api/admin/roles');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.roles = data.roles || [];
+                            this.rolePermissions = data.rolePermissions || {};
+                            this.permissionLabels = data.permissionLabels || {};
+                        } else {
+                            this.$message?.error(data.message || '加载角色权限失败');
+                        }
+                    } catch (error) {
+                        console.error('加载角色权限失败:', error);
+                        this.$message?.error('加载角色权限失败');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async updateRolePermission(role, permissionKey, enabled) {
+                    const prev = this.rolePermissions[role]?.[permissionKey];
+                    if (!this.rolePermissions[role]) this.rolePermissions[role] = {};
+                    this.rolePermissions[role][permissionKey] = enabled;
+                    try {
+                        const r = await fetch('/api/admin/roles/permissions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ role, permission: permissionKey, enabled })
+                        });
+                        const d = await r.json();
+                        if (!d.success) throw new Error(d.message || '更新失败');
+                        this.$message?.success('权限已更新');
+                    } catch (e) {
+                        this.rolePermissions[role][permissionKey] = prev;
+                        this.$message?.error(e.message || '更新失败');
+                    }
+                },
+                
+                async refreshTasks() {
+                    try {
+                        this.loading = true;
+                        const params = new URLSearchParams();
+                        if (this.taskFilters.username) params.append('username', this.taskFilters.username);
+                        params.append('days', String(this.taskFilters.days || 30));
+                        params.append('limit', String(this.taskFilters.limit || 200));
+                        const response = await fetch(`/api/admin/tasks?${params.toString()}`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.tasks = data.tasks || [];
+                            this.taskUsers = data.available_users || [];
+                            this.taskSummary = data.summary || this.taskSummary;
+                        } else {
+                            this.$message?.error(data.message || '加载任务列表失败');
+                        }
+                    } catch (error) {
+                        console.error('加载任务列表失败:', error);
+                        this.$message?.error('加载任务列表失败');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async refreshUserTaskOverview() {
+                    try {
+                        this.loading = true;
+                        const days = String(this.taskFilters.days || 30);
+                        const response = await fetch(`/api/admin/tasks/user_overview?days=${encodeURIComponent(days)}`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.userTaskOverview = data.overview || [];
+                        } else {
+                            this.$message?.error(data.message || '加载用户任务概览失败');
+                        }
+                    } catch (error) {
+                        console.error('加载用户任务概览失败:', error);
+                        this.$message?.error('加载用户任务概览失败');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async enterTaskMonitor() {
+                    this.activeTab = 'tasks';
+                    await this.refreshTasks();
+                    await this.refreshUserTaskOverview();
+                },
+
+                resetTaskFilters() {
+                    this.taskFilters.username = '';
+                    this.taskFilters.days = 30;
+                    this.taskFilters.limit = 200;
+                    this.refreshTasks();
+                    this.refreshUserTaskOverview();
+                },
+
+                filterTasksByUser(username) {
+                    this.taskFilters.username = username || '';
+                    this.refreshTasks();
+                },
+
+                taskStatusType(status) {
+                    if (status === '已完成') return 'success';
+                    if (status === '失败') return 'danger';
+                    if (status === '运行中') return 'warning';
+                    return 'info';
+                },
+
+                formatExecutionTime(sec) {
+                    if (sec === null || sec === undefined || sec === '') return '-';
+                    const n = Number(sec);
+                    return Number.isFinite(n) ? n.toFixed(2) : String(sec);
+                },
+
+                formatPercent(val) {
+                    if (val === null || val === undefined || val === '') return '-';
+                    const n = Number(val);
+                    return Number.isFinite(n) ? `${n.toFixed(1)}%` : '-';
+                },
+
+                feedbackStatusTag(status) {
+                    if (status === 'resolved') return 'success';
+                    if (status === 'processing') return 'warning';
+                    if (status === 'rejected') return 'danger';
+                    return 'info';
+                },
+
+                async refreshFeedbacks() {
+                    try {
+                        this.loading = true;
+                        const status = encodeURIComponent(this.feedbackFilterStatus || 'all');
+                        const response = await fetch(`/api/admin/feedbacks?status=${status}&limit=300`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.feedbacks = data.feedbacks || [];
+                        } else {
+                            this.$message?.error(data.message || '加载反馈失败');
+                        }
+                    } catch (error) {
+                        console.error('加载反馈失败:', error);
+                        this.$message?.error('加载反馈失败');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async replyFeedback(item) {
+                    const current = item.admin_reply || '';
+                    const { value } = await ElementPlus.ElMessageBox.prompt(
+                        `回复用户 ${item.username} 的反馈`,
+                        '反馈回复',
+                        {
+                            confirmButtonText: '提交',
+                            cancelButtonText: '取消',
+                            inputValue: current,
+                            inputPattern: /.+/,
+                            inputErrorMessage: '回复内容不能为空'
+                        }
+                    ).catch(() => ({ value: null }));
+                    if (!value) return;
+                    try {
+                        const r = await fetch(`/api/admin/feedbacks/${item.id}/reply`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ admin_reply: value, status: 'resolved' })
+                        });
+                        const d = await r.json();
+                        this.$message[d.success ? 'success' : 'error'](d.message || (d.success ? '回复成功' : '回复失败'));
+                        if (d.success) this.refreshFeedbacks();
+                    } catch (e) {
+                        this.$message?.error('回复失败');
+                    }
+                },
+                
+                async loadSettings() {
+                    try {
+                        const r = await fetch('/api/admin/settings');
+                        const d = await r.json();
+                        if (d.success && d.settings) {
+                            Object.assign(this.settings, d.settings);
+                        }
+                        const ar = await fetch('/api/admin/advanced_settings');
+                        const ad = await ar.json();
+                        if (ad.success && ad.settings) {
+                            Object.assign(this.advancedSettings, ad.settings);
+                        }
+                    } catch (e) {
+                        console.error('加载设置失败:', e);
+                    }
+                },
+                
+                async saveAdvancedSettings() {
+                    try {
+                        const r = await fetch('/api/admin/advanced_settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.advancedSettings)
+                        });
+                        const d = await r.json();
+                        if (d.success) {
+                            this.$message?.success(d.message || '高级设置已保存');
+                        } else {
+                            this.$message?.error(d.message || '保存失败');
+                        }
+                    } catch (e) {
+                        this.$message?.error('保存高级设置失败');
+                    }
+                },
+                
+                getChartInstance(domId, key) {
+                    const el = document.getElementById(domId);
+                    if (!el) return null;
+                    if (!this.chartInstances[key]) {
+                        this.chartInstances[key] = echarts.init(el);
+                    }
+                    return this.chartInstances[key];
+                },
+
+                renderDashboardCharts(charts) {
+                    const safeCharts = charts || {};
+                    const growth = safeCharts.user_growth || { labels: [], values: [] };
+                    const trend = safeCharts.analysis_trend || { labels: [], values: [] };
+                    const typeDist = safeCharts.analysis_type_dist || [];
+                    const topUsers = safeCharts.top_users || { labels: [], values: [] };
+
+                    const userGrowthChart = this.getChartInstance('userGrowthChart', 'userGrowth');
+                    if (userGrowthChart) {
+                        userGrowthChart.setOption({
+                        tooltip: { trigger: 'axis' },
+                            grid: { left: 40, right: 20, top: 30, bottom: 40 },
+                            xAxis: { type: 'category', data: growth.labels || [] },
+                        yAxis: { type: 'value' },
+                        series: [{
+                                name: '新增用户',
+                                data: growth.values || [],
+                            type: 'line',
+                                smooth: true,
+                                areaStyle: {}
+                            }]
+                        });
+                    }
+
+                    const analysisChart = this.getChartInstance('analysisChart', 'analysis');
+                    if (analysisChart) {
+                        analysisChart.setOption({
+                            tooltip: { trigger: 'axis' },
+                            grid: { left: 40, right: 20, top: 30, bottom: 40 },
+                            xAxis: { type: 'category', data: trend.labels || [] },
+                            yAxis: { type: 'value' },
+                            series: [{
+                                name: '分析次数',
+                                type: 'bar',
+                                data: trend.values || []
+                            }]
+                        });
+                    }
+
+                    const analysisTypeChart = this.getChartInstance('analysisTypeChart', 'analysisType');
+                    if (analysisTypeChart) {
+                        analysisTypeChart.setOption({
+                        tooltip: { trigger: 'item' },
+                            legend: { top: 5 },
+                        series: [{
+                                name: '分析类型',
+                            type: 'pie',
+                                radius: ['35%', '65%'],
+                                data: (typeDist && typeDist.length) ? typeDist : [{ name: '暂无数据', value: 1 }]
+                            }]
+                        });
+                    }
+
+                    const topUsersChart = this.getChartInstance('topUsersChart', 'topUsers');
+                    if (topUsersChart) {
+                        topUsersChart.setOption({
+                        tooltip: { trigger: 'axis' },
+                            grid: { left: 80, right: 20, top: 25, bottom: 25 },
+                            xAxis: { type: 'value' },
+                            yAxis: {
+                                type: 'category',
+                                data: topUsers.labels || [],
+                                axisLabel: { interval: 0 }
+                            },
+                            series: [{
+                                name: '分析次数',
+                                type: 'bar',
+                                data: topUsers.values || [],
+                                label: { show: true, position: 'right' }
+                            }]
+                        });
+                    }
+                },
+
+                renderSystemChart(history) {
+                    const rows = Array.isArray(history) ? history : [];
+                    const labels = rows.map(i => i.time || '');
+                    const cpuVals = rows.map(i => (i.cpu === null || i.cpu === undefined) ? null : Number(i.cpu));
+                    const memVals = rows.map(i => (i.memory === null || i.memory === undefined) ? null : Number(i.memory));
+                    const diskVals = rows.map(i => (i.disk === null || i.disk === undefined) ? null : Number(i.disk));
+
+                    const systemChart = this.getChartInstance('systemChart', 'system');
+                    if (!systemChart) return;
+
+                    systemChart.setOption({
+                        tooltip: { trigger: 'axis' },
+                        legend: { top: 5, data: ['CPU', '内存', '磁盘'] },
+                        grid: { left: 45, right: 20, top: 35, bottom: 35 },
+                        xAxis: { type: 'category', data: labels },
+                        yAxis: { type: 'value', max: 100 },
+                        series: [
+                            { name: 'CPU', type: 'line', smooth: true, data: cpuVals },
+                            { name: '内存', type: 'line', smooth: true, data: memVals },
+                            { name: '磁盘', type: 'line', smooth: true, data: diskVals }
+                        ]
+                    });
+                },
+                
+                editUser(user) {
+                    const choices = user.role === 'admin' ? '普通用户(user)' : '管理员(admin)';
+                    const targetRole = user.role === 'admin' ? 'user' : 'admin';
+                    ElementPlus.ElMessageBox.confirm(
+                        `确定将用户 "${user.username}" 的角色从 "${user.role}" 改为 "${targetRole}" 吗？`,
+                        '修改角色', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+                    ).then(async () => {
+                        try {
+                            const r = await fetch(`/api/admin/users/${user.id}/role`, {
+                                method: 'POST', headers: {'Content-Type':'application/json'},
+                                body: JSON.stringify({role: targetRole})
+                            });
+                            const d = await r.json();
+                            this.$message[d.success ? 'success' : 'error'](d.message);
+                            if (d.success) this.refreshUsers();
+                        } catch(e) { this.$message.error('操作失败'); }
+                    }).catch(() => {});
+                },
+
+                async resetUserPwd(user) {
+                    const { value } = await ElementPlus.ElMessageBox.prompt(
+                        `为用户 "${user.username}" 设置新密码（至少6位）：`, '重置密码',
+                        { confirmButtonText: '确定', cancelButtonText: '取消', inputPattern: /.{6,}/, inputErrorMessage: '密码至少6位' }
+                    ).catch(() => ({value: null}));
+                    if (!value) return;
+                    try {
+                        const r = await fetch(`/api/admin/users/${user.id}/reset_password`, {
+                            method: 'POST', headers: {'Content-Type':'application/json'},
+                            body: JSON.stringify({new_password: value})
+                        });
+                        const d = await r.json();
+                        this.$message[d.success ? 'success' : 'error'](d.message);
+                    } catch(e) { this.$message.error('重置失败'); }
+                },
+
+                async toggleUser(user) {
+                    const action = user.is_active ? '冻结' : '启用';
+                    try {
+                        await ElementPlus.ElMessageBox.confirm(
+                            `确定${action}用户 "${user.username}" 吗？`, `${action}用户`,
+                            { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+                        );
+                        const r = await fetch(`/api/admin/users/${user.id}/toggle`, {
+                            method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}'
+                        });
+                        const d = await r.json();
+                        this.$message[d.success ? 'success' : 'error'](d.message);
+                        if (d.success) this.refreshUsers();
+                    } catch(e) { if (e !== 'cancel') this.$message.error('操作失败'); }
+                },
+
+                async deleteUser(user) {
+                    try {
+                        await ElementPlus.ElMessageBox.confirm(
+                            `确定永久删除用户 "${user.username}" 吗？此操作不可恢复！`, '删除用户',
+                            { confirmButtonText: '删除', cancelButtonText: '取消', type: 'error' }
+                        );
+                        const r = await fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' });
+                        const d = await r.json();
+                        this.$message[d.success ? 'success' : 'error'](d.message);
+                        if (d.success) this.refreshUsers();
+                    } catch(e) { if (e !== 'cancel') this.$message.error('删除失败'); }
+                },
+                
+                viewAnalysis(analysis) {
+                    ElementPlus.ElMessageBox.alert(
+                        `ID: ${analysis.id}\n用户: ${analysis.username}\n股票: ${analysis.ticker}\n类型: ${analysis.analysis_type}\n时间: ${analysis.created_at}\n耗时: ${analysis.execution_time || '-'}秒`,
+                        '分析记录详情', { confirmButtonText: '关闭' }
+                    );
+                },
+
+                async deleteAnalysis(analysis) {
+                    try {
+                        await ElementPlus.ElMessageBox.confirm(
+                            `确定删除分析记录 #${analysis.id}（${analysis.ticker}）吗？`, '删除分析记录',
+                            { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+                        );
+                        const r = await fetch(`/api/admin/analyses/${analysis.id}`, { method: 'DELETE' });
+                        const d = await r.json();
+                        this.$message[d.success ? 'success' : 'error'](d.message);
+                        if (d.success) this.refreshAnalyses();
+                    } catch(e) { if (e !== 'cancel') this.$message.error('删除失败'); }
+                },
+                
+                async saveSettings() {
+                    try {
+                        const response = await fetch('/api/admin/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.settings)
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            this.$message.success('设置保存成功');
+                        }
+                    } catch (error) {
+                        console.error('保存设置失败:', error);
+                    }
+                },
+
+                async sendTestEmail() {
+                    if (!this.settings.testEmail) {
+                        this.$message?.warning('请先填写测试收件邮箱');
+                        return;
+                    }
+                    try {
+                        const response = await fetch('/api/admin/send_test_email', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to_email: this.settings.testEmail })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            this.$message?.success(data.message || '测试邮件发送成功');
+                        } else {
+                            this.$message?.error(data.message || '测试邮件发送失败');
+                        }
+                    } catch (error) {
+                        console.error('发送测试邮件失败:', error);
+                        this.$message?.error('发送测试邮件失败');
+                    }
+                }
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+{% endraw %}
+</body>
+</html>

@@ -1,0 +1,5 @@
+Average Accuracy: 99.33828268636714
+Best Stock: ABBV
+Worst Stock: ABBV
+Average RMSE: 1.4183985574744775
+Average MAE: 0.9705236357279653

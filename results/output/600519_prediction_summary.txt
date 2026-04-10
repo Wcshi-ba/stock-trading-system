@@ -1,0 +1,5 @@
+Average Accuracy: 98.7030509012372
+Best Stock: 600519
+Worst Stock: 600519
+Average RMSE: 27.179822585576307
+Average MAE: 18.804449266951814

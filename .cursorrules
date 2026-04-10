@@ -1,0 +1,53 @@
+# 智能股票交易系统 - A股版本开发指南
+
+## 核心架构
+1. **数据源**: 使用AKShare获取A股实时数据，支持沪深北三市全市场
+2. **兼容性**: 保持与美股系统100%兼容，CSV格式完全一致
+3. **智能切换**: 自动识别A股代码(6位数字)vs美股代码(字母)，无缝切换数据源
+
+## A股数据获取要点
+1. **股票代码格式**:
+   - 沪市主板: 600xxx, 601xxx, 603xxx, 605xxx
+   - 深市主板: 000xxx, 001xxx  
+   - 深市中小板: 002xxx
+   - 深市创业板: 300xxx
+   - 北交所: 430xxx, 830xxx, 870xxx
+
+2. **数据字段映射**:
+   - AKShare字段 → 标准字段: 日期→Date, 开盘→Open, 收盘→Close, 最高→High, 最低→Low, 成交量→Volume
+   - 复权处理: 默认前复权(adjust="qfq")，保持技术指标连续性
+
+3. **API调用**:
+   - 主函数: `download_a_share(stock_code, start_date, end_date)`
+   - 验证函数: `validate_stock_code(stock_code)` 
+   - 列表函数: `get_stock_list()`
+
+## 开发规范
+1. **新增依赖**: `pip install akshare>=1.12.0`
+2. **文件结构**: akshare_data.py 负责数据获取，enhanced_flask_interface_advanced.py 负责API路由
+3. **错误处理**: AKShare失败时自动降级到本地缓存，保证系统稳定性
+4. **性能**: 添加请求间隔避免被限流，数据质量检查确保完整性
+
+## 测试验证
+1. **单元测试**: `python akshare_data.py` 验证数据下载
+2. **集成测试**: 浏览器输入A股代码(如600519)测试完整流程
+3. **兼容测试**: 美股代码(如AAPL)仍使用原有逻辑
+
+## 扩展功能
+- 实时1分钟数据: `ak.stock_zh_a_hist_min_em()`
+- 财务报表: `ak.stock_financial_analysis_indicator()`
+- 概念板块: `ak.stock_board_concept_cons_ths()`
+- 北向资金: `ak.stock_hsgt_north_net_flow_in_em()`
+- 选股器: `ak.stock_rank_lxqs()`
+
+## Flask + Vue 模板规范
+1. **Jinja2 与 Vue 冲突**: Flask 用 Jinja2 渲染时会把 `{{ }}` 当作 Jinja2 语法，而 Vue 也使用 `{{ }}` 做数据绑定，会导致 "unexpected char '?'" 等错误
+2. **解决方案**: 在含 Vue 语法的模板（如 index_advanced.html、admin_dashboard.html）中，用 `{% raw %}...{% endraw %}` 包裹整个 Vue 应用（从 `<div id="app">` 到 `</script>`），让 Jinja2 不解析并原样输出给 Vue
+3. **新增组件**: 在已用 `{% raw %}` 包裹的模板内新增 Vue 组件时，直接使用 `{{ }}`、`v-model` 等即可，无需再单独包裹
+
+## 注意事项
+1. 所有新增功能必须保持与现有LSTM/RL/可视化模块的兼容性
+2. 数据获取失败时要有明确的错误提示和降级方案
+3. 遵循AKShare的使用规范，避免频繁请求被限制
+4. 确保数据质量，处理缺失值和异常值
+

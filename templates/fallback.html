@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>智能股票交易系统</title>
+  <style>
+    body{font-family:Arial;margin:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff}
+    .card{max-width:860px;margin:0 auto;background:rgba(255,255,255,.1);padding:28px;border-radius:16px;backdrop-filter:blur(10px)}
+    .btn{background:#FF6B6B;color:#fff;padding:10px 22px;border:0;border-radius:24px;margin:6px;cursor:pointer}
+    .status{padding:10px;border-radius:6px;margin:10px 0;background:rgba(76,175,80,.25)}
+  </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>智能股票交易系统</h1>
+      <div class="status">系统已启动。若主模板渲染失败，已回退到此页面。</div>
+      <div>
+        <button class="btn" onclick="testAPI()">测试API</button>
+        <button class="btn" onclick="showStocks()">查看股票</button>
+      </div>
+      <div id="res"></div>
+    </div>
+    <script>
+      async function testAPI(){const r=await fetch('/api/health');const d=await r.json();document.getElementById('res').innerText='API: '+JSON.stringify(d)}
+      async function showStocks(){const r=await fetch('/available_stocks');const d=await r.json();document.getElementById('res').innerText='Stocks: '+(d.stocks||[]).join(', ')}
+    </script>
+  </body>
+</html>
