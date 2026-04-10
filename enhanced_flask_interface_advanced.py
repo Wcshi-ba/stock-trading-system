@@ -9,6 +9,7 @@ from functools import wraps
 from flask import (Flask, request, jsonify, session, send_file, send_from_directory,
                    render_template, redirect, url_for)
 import jwt, hashlib, warnings, asyncio, time, logging, re
+from werkzeug.utils import secure_filename
 warnings.filterwarnings('ignore')
 
 # 性能分析工具
@@ -53,7 +54,11 @@ app.config['JWT_SECRET_KEY'] = 'jwt-secret-string'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SAVE_DIR = os.path.join(BASE_DIR, 'results')
 TEMP_DIR  = os.path.join(BASE_DIR, 'tmp', 'flask')
-for d in [TEMP_DIR, os.path.join(SAVE_DIR, 'pic', 'predictions'), os.path.join(SAVE_DIR, 'pic', 'loss'), os.path.join(SAVE_DIR, 'pic', 'earnings'), os.path.join(SAVE_DIR, 'pic', 'trades'), os.path.join(SAVE_DIR, 'transactions')]:
+UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')
+AVATAR_UPLOAD_DIR = os.path.join(UPLOADS_DIR, 'avatars')
+ALLOWED_AVATAR_EXTS = {'jpg', 'jpeg', 'png', 'webp'}
+MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
+for d in [TEMP_DIR, UPLOADS_DIR, AVATAR_UPLOAD_DIR, os.path.join(SAVE_DIR, 'pic', 'predictions'), os.path.join(SAVE_DIR, 'pic', 'loss'), os.path.join(SAVE_DIR, 'pic', 'earnings'), os.path.join(SAVE_DIR, 'pic', 'trades'), os.path.join(SAVE_DIR, 'transactions')]:
     os.makedirs(d, exist_ok=True)
 
 # ---------- 全局实例 ----------
@@ -131,7 +136,16 @@ def login_required(f):
 def index():
     return render_template('index_advanced.html')
 
+
+@app.route('/profile')
+def profile_page():
+    # 个人中心仅允许已登录用户访问（游客/未登录都跳登录页）
+    if not session.get('user_id'):
+        return redirect(url_for('login_test'))
+    return render_template('profile.html')
+
 @app.route('/login-test')
+@app.route('/login')
 def login_test():
     return render_template('login_test.html')
 
@@ -2290,7 +2304,137 @@ def whitelabel_config():
 @app.route('/api/user/profile')
 @login_required
 def user_profile(): 
+    if not session.get('user_id'):
+        return jsonify(success=False, message='请先登录'), 401
     return jsonify(db['user_manager'].get_user_profile(session['user_id']))
+
+
+@app.route('/api/user/profile', methods=['PUT'])
+@login_required
+def user_profile_update():
+    """更新当前用户资料（昵称/邮箱/头像/投资偏好）"""
+    try:
+        if not session.get('user_id'):
+            return jsonify(success=False, message='请先登录'), 401
+        user_id = int(session.get('user_id'))
+        d = request.get_json() or {}
+        username = (d.get('username') or '').strip()
+        email = (d.get('email') or '').strip()
+        avatar_url = (d.get('avatar_url') or '').strip()
+        investment_preference = (d.get('investment_preference') or '').strip()
+        risk_tolerance = (d.get('risk_tolerance') or '').strip()
+        investment_goal = (d.get('investment_goal') or '').strip()
+
+        conn = db['db'].get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT id, username, email FROM users WHERE id = ?', (user_id,))
+            old_row = cursor.fetchone()
+            if not old_row:
+                return jsonify(success=False, message='用户不存在')
+
+            if username and username != old_row['username']:
+                if not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
+                    return jsonify(success=False, message='用户名只能包含3-20位字母、数字或下划线')
+                cursor.execute('SELECT id FROM users WHERE username = ? AND id <> ?', (username, user_id))
+                if cursor.fetchone():
+                    return jsonify(success=False, message='用户名已存在')
+            else:
+                username = old_row['username']
+
+            if email:
+                if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+                    return jsonify(success=False, message='邮箱格式不正确')
+                cursor.execute('SELECT id FROM users WHERE email = ? AND id <> ?', (email, user_id))
+                if cursor.fetchone():
+                    return jsonify(success=False, message='邮箱已被占用')
+            else:
+                email = old_row['email']
+
+            cursor.execute('''
+                UPDATE users
+                SET username = ?, email = ?, avatar_url = ?,
+                    investment_preference = ?, risk_tolerance = ?, investment_goal = ?
+                WHERE id = ?
+            ''', (
+                username, email, avatar_url or None,
+                investment_preference or None, risk_tolerance or None, investment_goal or None,
+                user_id
+            ))
+            cursor.execute('''
+                INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp)
+                VALUES (?, 'USER_PROFILE_UPDATE', ?, ?, ?)
+            ''', (user_id, f'username={username}, email={email}', request.remote_addr, datetime.now()))
+            conn.commit()
+        finally:
+            conn.close()
+
+        session['username'] = username
+        return jsonify(success=True, message='个人资料已更新')
+    except Exception as e:
+        return jsonify(success=False, message=f'更新失败: {e}')
+
+
+def _is_allowed_avatar_file(filename: str) -> bool:
+    if not filename or '.' not in filename:
+        return False
+    ext = filename.rsplit('.', 1)[-1].lower()
+    return ext in ALLOWED_AVATAR_EXTS
+
+
+@app.route('/api/user/avatar', methods=['POST'])
+@login_required
+def user_avatar_upload():
+    """头像本地上传"""
+    try:
+        if not session.get('user_id'):
+            return jsonify(success=False, message='请先登录'), 401
+        if 'avatar' not in request.files:
+            return jsonify(success=False, message='未检测到上传文件')
+        f = request.files.get('avatar')
+        if not f or not f.filename:
+            return jsonify(success=False, message='请选择头像文件')
+        if not _is_allowed_avatar_file(f.filename):
+            return jsonify(success=False, message='仅支持 jpg/jpeg/png/webp 格式')
+
+        # 文件大小限制 2MB
+        f.seek(0, os.SEEK_END)
+        size = f.tell()
+        f.seek(0)
+        if size > MAX_AVATAR_SIZE:
+            return jsonify(success=False, message='头像不能超过 2MB')
+
+        user_id = int(session.get('user_id'))
+        ext = secure_filename(f.filename).rsplit('.', 1)[-1].lower()
+        new_name = f'u{user_id}_{int(time.time())}_{os.urandom(4).hex()}.{ext}'
+        save_path = os.path.join(AVATAR_UPLOAD_DIR, new_name)
+        f.save(save_path)
+        avatar_url = f'/uploads/avatars/{new_name}'
+
+        conn = db['db'].get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT avatar_url FROM users WHERE id = ?', (user_id,))
+            row = cursor.fetchone()
+            old_avatar = (row['avatar_url'] if row and 'avatar_url' in row.keys() else None) or ''
+            cursor.execute('UPDATE users SET avatar_url = ? WHERE id = ?', (avatar_url, user_id))
+            conn.commit()
+        finally:
+            conn.close()
+
+        # 清理旧头像（只删本地上传目录的文件）
+        if old_avatar and old_avatar.startswith('/uploads/avatars/'):
+            old_name = old_avatar.split('/uploads/avatars/', 1)[-1]
+            old_path = os.path.join(AVATAR_UPLOAD_DIR, old_name)
+            if os.path.isfile(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
+
+        return jsonify(success=True, message='头像上传成功', avatar_url=avatar_url)
+    except Exception as e:
+        return jsonify(success=False, message=f'头像上传失败: {e}')
 
 @app.route('/api/analysis/history')
 @login_required
@@ -2315,6 +2459,10 @@ def del_fav(ticker):
     return jsonify(success=suc, message='已移除' if suc else '失败')
 
 # ---------- 静态图片 ----------
+@app.route('/uploads/avatars/<path:filename>')
+def serve_uploaded_avatar(filename):
+    return send_from_directory(AVATAR_UPLOAD_DIR, filename)
+
 @app.route('/images/<path:filename>')
 def serve_image(filename):
     # 兼容旧路径：/images/predictions/xxx.png 或直接 /images/xxx.png

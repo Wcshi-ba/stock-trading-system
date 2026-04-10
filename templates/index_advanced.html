@@ -188,6 +188,84 @@
             margin-bottom: 20px;
         }
         
+        .user-info.pro-card {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+            background: linear-gradient(135deg, #4b6cb7 0%, #182848 50%, #8e44ad 100%);
+        }
+        
+        .user-info.pro-card::before {
+            content: '';
+            position: absolute;
+            inset: -120% -40%;
+            background: conic-gradient(
+                from 0deg,
+                rgba(255, 80, 145, 0.25),
+                rgba(74, 144, 226, 0.25),
+                rgba(46, 204, 113, 0.25),
+                rgba(255, 183, 77, 0.25),
+                rgba(255, 80, 145, 0.25)
+            );
+            transform: rotate(0deg);
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .user-info.pro-card.animate-gradient::before {
+            opacity: 1;
+            animation: swirlGlow 5s ease-in-out;
+        }
+        
+        .user-info-inner {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .user-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .default-avatar {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .user-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .user-name {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+        
+        .user-role {
+            display: inline-block;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            width: fit-content;
+        }
+        
+        @keyframes swirlGlow {
+            0% { transform: rotate(0deg); filter: blur(8px); }
+            100% { transform: rotate(360deg); filter: blur(2px); }
+        }
+        
         .user-info h3 {
             margin: 0 0 10px 0;
             font-size: 16px;
@@ -566,7 +644,8 @@
                     <span class="tag">AI驱动, 实时预测</span>
                 </div>
                 <div class="nav-buttons">
-                    <el-button @click="goToLoginTest" type="primary" plain>登录测试</el-button>
+                    <el-button @click="goToLoginTest" type="primary" plain v-if="!isLoggedIn">登录</el-button>
+                    <el-button @click="goToProfile" type="success" plain v-if="isLoggedIn">个人中心</el-button>
                     <el-button @click="goToAdmin" type="warning" plain v-if="isAdmin">管理员后台</el-button>
                     <el-button @click="logout" type="danger" plain v-if="isLoggedIn">退出登录</el-button>
                 </div>
@@ -583,13 +662,22 @@
                     <button class="login-button" @click="goToLoginTest">立即登录</button>
                 </div>
                 
-                <div v-else class="user-info">
-                    <h3>欢迎回来</h3>
-                    <p>用户: <span v-text="userInfo.username"></span></p>
-                    <p>角色: <span v-text="userInfo.role === 'admin' ? '管理员' : '普通用户'"></span></p>
-                    <div class="user-actions">
-                        <button class="user-button" @click="goToLoginTest">切换账号</button>
-                        <button class="user-button" @click="logout">退出登录</button>
+                <div v-else class="user-info pro-card" :class="{'animate-gradient': profileGlowActive}">
+                    <div class="user-info-inner">
+                        <div class="user-top">
+                            <img :src="currentAvatarUrl" class="default-avatar" alt="avatar">
+                            <div class="user-meta">
+                                <span class="user-name" v-text="userInfo.username || '未命名用户'"></span>
+                                <span class="user-role">{{ userInfo.role === 'admin' ? '管理员' : '普通用户' }}</span>
+                            </div>
+                        </div>
+                        <p>邮箱: <span v-text="userInfo.email || '-'"></span></p>
+                        <p>偏好: <span v-text="userInfo.investment_preference || '-'"></span></p>
+                        <div class="user-actions">
+                            <button class="user-button" @click="goToProfile">个人中心</button>
+                            <button class="user-button" @click="goToLoginTest">切换账号</button>
+                            <button class="user-button" @click="logout">退出登录</button>
+                        </div>
                     </div>
                 </div>
                 
@@ -1069,13 +1157,12 @@
 
     <script>
         const { createApp } = Vue;
-        const { ElButton, ElInput, ElFormItem, ElDatePicker, ElSlider, ElInputNumber, ElTabs, ElTabPane } = ElementPlus;
+        const { ElButton, ElInput, ElDatePicker, ElSlider, ElInputNumber, ElTabs, ElTabPane } = ElementPlus;
 
         createApp({
             components: {
                 ElButton,
                 ElInput,
-                ElFormItem,
                 ElDatePicker,
                 ElSlider,
                 ElInputNumber,
@@ -1099,6 +1186,10 @@
                     isLoggedIn: false,
                     isAdmin: false,
                     userInfo: {},
+                    profileGlowActive: false,
+                    profileGlowTimer: null,
+                    profileGlowEndTimer: null,
+                    defaultAvatarUrl: '/assets/c__Users_86173_AppData_Roaming_Cursor_User_workspaceStorage_3d8024f677e01873f91cf2fc928d4e7a_images_image-ac6ea50a-fa2f-4034-9c88-46e7619e2e02.png',
                     popularStocks: ['600519', '000001', '300750', '600036', '000858', '002415'],
                     stockList: [],
                     showStockSelector: false,
@@ -1232,30 +1323,47 @@
                 },
                 async checkLoginStatus() {
                     try {
-                        const response = await fetch('/api/user/profile');
+                        const response = await fetch('/api/user/profile', { cache: 'no-store' });
                         if (response.ok) {
                             const data = await response.json();
                             if (data.success) {
                                 this.isLoggedIn = true;
-                                this.userInfo = data.profile;
+                                this.userInfo = data.profile || {};
                                 this.isAdmin = data.profile.role === 'admin';
+                                this.scheduleProfileGlow();
+                                return;
                             }
-                        } else {
-                            // 未登录则视为游客
-                            this.isLoggedIn = true;
-                            this.isAdmin = false;
-                            this.userInfo = { username: 'guest', role: 'guest' };
                         }
-                    } catch (error) {
-                        // 用户未登录 -> 游客
-                        this.isLoggedIn = true;
+                        this.isLoggedIn = false;
                         this.isAdmin = false;
-                        this.userInfo = { username: 'guest', role: 'guest' };
+                        this.userInfo = {};
+                    } catch (error) {
+                        // 未登录/会话失效
+                        this.isLoggedIn = false;
+                        this.isAdmin = false;
+                        this.userInfo = {};
                     }
                 },
                 
+                scheduleProfileGlow() {
+                    if (this.profileGlowTimer) clearTimeout(this.profileGlowTimer);
+                    if (this.profileGlowEndTimer) clearTimeout(this.profileGlowEndTimer);
+                    this.profileGlowActive = false;
+                    // 登录成功后延迟10秒触发，持续5秒
+                    this.profileGlowTimer = setTimeout(() => {
+                        this.profileGlowActive = true;
+                        this.profileGlowEndTimer = setTimeout(() => {
+                            this.profileGlowActive = false;
+                        }, 5000);
+                    }, 10000);
+                },
+
                 goToLoginTest() {
-                    window.open('/login-test', '_blank');
+                    window.location.href = '/login-test';
+                },
+
+                goToProfile() {
+                    window.location.href = '/profile';
                 },
                 
                 goToAdmin() {
@@ -1271,6 +1379,9 @@
                         const response = await fetch('/api/logout', { method: 'POST' });
                         const data = await response.json();
                         if (data.success) {
+                            if (this.profileGlowTimer) clearTimeout(this.profileGlowTimer);
+                            if (this.profileGlowEndTimer) clearTimeout(this.profileGlowEndTimer);
+                            this.profileGlowActive = false;
                             this.isLoggedIn = false;
                             this.isAdmin = false;
                             this.userInfo = {};
@@ -1785,6 +1896,11 @@
                 },
             },
             computed: {
+                currentAvatarUrl() {
+                    const u = this.userInfo || {};
+                    const avatar = String(u.avatar_url || '').trim();
+                    return avatar || this.defaultAvatarUrl;
+                },
                 rawTotalPages() { return Math.max(1, Math.ceil(this.rawData.length / this.pageSize)); },
                 transTotalPages() { return Math.max(1, Math.ceil(this.transactionsData.length / this.pageSize)); },
                 rawTablePage() { const s = (this.rawPage-1) * this.pageSize; return this.rawData.slice(s, s + this.pageSize); },

@@ -643,7 +643,7 @@ class UserManager:
                     'last_login': user['last_login'],
                     'preferences': json.loads(user['preferences'] or '{}'),
                     'avatar_url': user['avatar_url'],
-                    'role': user.get('role', 'user'),
+                    'role': user['role'] if 'role' in user.keys() else 'user',
                     'stats': {
                         'total_analyses': stats['total_analyses'] or 0,
                         'avg_accuracy': stats['avg_accuracy'] or 0,

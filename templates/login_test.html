@@ -444,11 +444,11 @@
                             const role = data.user.role || 'user';
                             this.userRole = role;
                             this.addTestResult('success', `登录成功: ${data.user.username}`);
-                            // 管理员跳转管理员后台，其余跳转首页
+                            // 管理员跳转管理员后台，其余跳转个人中心
                             if (role === 'admin') {
                                 window.location.href = '/admin';
                             } else {
-                                window.location.href = '/';
+                                window.location.href = '/profile';
                             }
                         } else {
                             this.$message.error(data.message);

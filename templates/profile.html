@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 智能股票交易系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/element-plus@2.4.4/dist/index.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/element-plus@2.4.4/dist/index.full.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #1f2937;
+        }
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 28px 18px 40px;
+        }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+        .title {
+            color: #fff;
+            font-weight: 700;
+            font-size: 24px;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            border-radius: 16px;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.14);
+            padding: 22px;
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: -120% -50%;
+            background: conic-gradient(from 120deg, rgba(120, 119, 255, 0.2), rgba(76, 201, 240, 0.16), rgba(247, 37, 133, 0.18), rgba(120, 119, 255, 0.2));
+            animation: swirlGlow 14s linear infinite;
+            z-index: 0;
+        }
+        .card-inner {
+            position: relative;
+            z-index: 1;
+        }
+        @keyframes swirlGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .profile-head {
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .avatar {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid rgba(99, 102, 241, 0.3);
+            background: #eef2ff;
+        }
+        .meta h2 {
+            margin: 0 0 6px;
+            font-size: 22px;
+        }
+        .meta p {
+            margin: 0;
+            color: #4b5563;
+        }
+        .uploader {
+            margin-top: 12px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .hint {
+            color: #6b7280;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+{% raw %}
+<div id="app" class="wrap">
+    <div class="topbar">
+        <div class="title">个人中心</div>
+        <div>
+            <el-button @click="toHome" plain>返回主界面</el-button>
+            <el-button type="danger" plain @click="logout">退出登录</el-button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-inner">
+            <div class="profile-head">
+                <img class="avatar" :src="currentAvatarUrl" alt="avatar">
+                <div class="meta">
+                    <h2 v-text="profile.username || '未命名用户'"></h2>
+                    <p>{{ profile.role === 'admin' ? '管理员' : '普通用户' }} · {{ profile.email || '未设置邮箱' }}</p>
+                    <div class="uploader">
+                        <input ref="avatarInput" type="file" accept=".jpg,.jpeg,.png,.webp" @change="uploadAvatar">
+                        <span class="hint">仅支持 jpg/jpeg/png/webp，最大 2MB</span>
+                    </div>
+                </div>
+            </div>
+
+            <el-form label-width="100px">
+                <el-form-item label="用户名">
+                    <el-input v-model="form.username" placeholder="3-20位字母/数字/下划线"></el-input>
+                </el-form-item>
+                <el-form-item label="邮箱">
+                    <el-input v-model="form.email" placeholder="example@domain.com"></el-input>
+                </el-form-item>
+                <el-form-item label="投资偏好">
+                    <el-input v-model="form.investment_preference" placeholder="如：成长型/稳健型"></el-input>
+                </el-form-item>
+                <el-form-item label="风险偏好">
+                    <el-input v-model="form.risk_tolerance" placeholder="low/medium/high"></el-input>
+                </el-form-item>
+                <el-form-item label="投资目标">
+                    <el-input v-model="form.investment_goal" placeholder="如：长期增值"></el-input>
+                </el-form-item>
+            </el-form>
+
+            <el-button type="primary" @click="saveProfile" :loading="saving">保存资料</el-button>
+        </div>
+    </div>
+</div>
+{% endraw %}
+
+<script>
+    const { createApp } = Vue;
+    const { ElButton, ElForm, ElFormItem, ElInput } = ElementPlus;
+
+    createApp({
+        components: { ElButton, ElForm, ElFormItem, ElInput },
+        data() {
+            return {
+                profile: {},
+                form: {
+                    username: '',
+                    email: '',
+                    investment_preference: '',
+                    risk_tolerance: '',
+                    investment_goal: ''
+                },
+                saving: false,
+                defaultAvatarUrl: '/assets/c__Users_86173_AppData_Roaming_Cursor_User_workspaceStorage_3d8024f677e01873f91cf2fc928d4e7a_images_image-ac6ea50a-fa2f-4034-9c88-46e7619e2e02.png'
+            };
+        },
+        computed: {
+            currentAvatarUrl() {
+                const avatar = String(this.profile.avatar_url || '').trim();
+                return avatar || this.defaultAvatarUrl;
+            }
+        },
+        mounted() {
+            this.loadProfile();
+        },
+        methods: {
+            async loadProfile() {
+                try {
+                    const resp = await fetch('/api/user/profile', { cache: 'no-store' });
+                    const data = await resp.json();
+                    if (!data.success) {
+                        this.$message.error(data.message || '获取资料失败');
+                        return;
+                    }
+                    this.profile = data.profile || {};
+                    this.form = {
+                        username: this.profile.username || '',
+                        email: this.profile.email || '',
+                        investment_preference: this.profile.investment_preference || '',
+                        risk_tolerance: this.profile.risk_tolerance || '',
+                        investment_goal: this.profile.investment_goal || ''
+                    };
+                } catch (e) {
+                    this.$message.error('获取个人资料失败');
+                }
+            },
+            async saveProfile() {
+                this.saving = true;
+                try {
+                    const payload = {
+                        username: (this.form.username || '').trim(),
+                        email: (this.form.email || '').trim(),
+                        avatar_url: (this.profile.avatar_url || '').trim(),
+                        investment_preference: (this.form.investment_preference || '').trim(),
+                        risk_tolerance: (this.form.risk_tolerance || '').trim(),
+                        investment_goal: (this.form.investment_goal || '').trim()
+                    };
+                    const resp = await fetch('/api/user/profile', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await resp.json();
+                    if (data.success) {
+                        this.$message.success(data.message || '保存成功');
+                        await this.loadProfile();
+                    } else {
+                        this.$message.error(data.message || '保存失败');
+                    }
+                } catch (e) {
+                    this.$message.error('保存资料失败');
+                } finally {
+                    this.saving = false;
+                }
+            },
+            async uploadAvatar(event) {
+                const file = event && event.target && event.target.files ? event.target.files[0] : null;
+                if (!file) return;
+                const formData = new FormData();
+                formData.append('avatar', file);
+                try {
+                    const resp = await fetch('/api/user/avatar', { method: 'POST', body: formData });
+                    const data = await resp.json();
+                    if (data.success) {
+                        this.$message.success(data.message || '头像上传成功');
+                        this.profile.avatar_url = data.avatar_url || this.profile.avatar_url;
+                    } else {
+                        this.$message.error(data.message || '头像上传失败');
+                    }
+                } catch (e) {
+                    this.$message.error('头像上传失败');
+                } finally {
+                    if (this.$refs.avatarInput) this.$refs.avatarInput.value = '';
+                }
+            },
+            toHome() {
+                window.location.href = '/';
+            },
+            async logout() {
+                try {
+                    await fetch('/api/logout', { method: 'POST' });
+                } finally {
+                    window.location.href = '/';
+                }
+            }
+        }
+    }).use(ElementPlus).mount('#app');
+</script>
+</body>
+</html>
